@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Buraco Negro de Kerr</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX for beautiful math equations -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Language Toggle Styles */
+        html:not([lang="pt-BR"]) .lang-pt { display: none !important; }
+        html[lang="pt-BR"] .lang-en { display: none !important; }
+        
+        .lang-switcher {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(20, 20, 20, 0.7);
+            border: 1px solid rgba(255, 102, 0, 0.3);
+            border-radius: 8px;
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+            backdrop-filter: blur(10px);
+        }
+        .lang-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .lang-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .lang-btn.active {
+            color: #ff6600;
+            background: rgba(255, 102, 0, 0.2);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Switcher -->
+    <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLanguage('en')">EN</button>
+        <button class="lang-btn" onclick="setLanguage('pt-BR')">PT</button>
+    </div>
+
+    <!-- Canvas de Renderização em Tempo Real -->
+    <canvas id="simulator-canvas"></canvas>
+
+    <!-- Painel de Controle Principal (Glassmorphic Interface) -->
+    <main class="control-panel">
+        <header>
+            <div class="badge">
+                <span class="lang-en">General Relativity</span>
+                <span class="lang-pt">Relatividade Geral</span>
+            </div>
+            <h1>Kerr Black Hole</h1>
+            <p class="subtitle">
+                <span class="lang-en">Interactive Space Simulator</span>
+                <span class="lang-pt">Simulador Espacial Interativo</span>
+            </p>
+        </header>
+
+        <section class="controls-section">
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="spin-slider">
+                        <span class="lang-en">Black Hole Spin (a)</span>
+                        <span class="lang-pt">Spin do Buraco Negro (a)</span>
+                    </label>
+                    <span id="spin-value" class="value-display">0.90</span>
+                </div>
+                <input type="range" id="spin-slider" min="0.0" max="0.99" step="0.01" value="0.90">
+                <div class="slider-labels">
+                    <span>Schwarzschild (0.0)</span>
+                    <span>Max Kerr (0.99)</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="inc-slider">
+                        <span class="lang-en">Camera Inclination</span>
+                        <span class="lang-pt">Inclinação da Câmera</span>
+                    </label>
+                    <span id="inc-value" class="value-display">15°</span>
+                </div>
+                <input type="range" id="inc-slider" min="-89" max="89" step="1" value="15">
+                <div class="slider-labels">
+                    <span class="lang-en">South Pole (-90°)</span><span class="lang-pt">Polo Sul (-90°)</span>
+                    <span class="lang-en">North Pole (90°)</span><span class="lang-pt">Polo Norte (90°)</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="dist-slider">
+                        <span class="lang-en">Camera Distance</span>
+                        <span class="lang-pt">Distância da Câmera</span>
+                    </label>
+                    <span id="dist-value" class="value-display">15M</span>
+                </div>
+                <input type="range" id="dist-slider" min="6.0" max="80.0" step="0.5" value="15.0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="temp-slider">
+                        <span class="lang-en">Disk Temperature</span>
+                        <span class="lang-pt">Temperatura do Disco</span>
+                    </label>
+                    <span id="temp-value" class="value-display">6500K</span>
+                </div>
+                <input type="range" id="temp-slider" min="2000" max="12000" step="100" value="6500">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="outer-slider">
+                        <span class="lang-en">Disk Outer Radius</span>
+                        <span class="lang-pt">Raio Externo do Disco</span>
+                    </label>
+                    <span id="outer-value" class="value-display">18M</span>
+                </div>
+                <input type="range" id="outer-slider" min="8.0" max="30.0" step="0.5" value="18.0">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="step-slider">
+                        <span class="lang-en">Integration Step (dt)</span>
+                        <span class="lang-pt">Passo de Integração (dt)</span>
+                    </label>
+                    <span id="step-value" class="value-display">0.05</span>
+                </div>
+                <input type="range" id="step-slider" min="0.02" max="0.15" step="0.01" value="0.05">
+                <div class="slider-labels">
+                    <span class="lang-en">High Precision</span><span class="lang-pt">Alta Precisão</span>
+                    <span class="lang-en">Fast</span><span class="lang-pt">Rápido</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="iter-slider">
+                        <span class="lang-en">Raymarch Iterations</span>
+                        <span class="lang-pt">Iterações de Raymarching</span>
+                    </label>
+                    <span id="iter-value" class="value-display">150</span>
+                </div>
+                <input type="range" id="iter-slider" min="50" max="350" step="10" value="150">
+                <div class="slider-labels">
+                    <span class="lang-en">Fast (Low Range)</span><span class="lang-pt">Rápido (Curto Alcance)</span>
+                    <span class="lang-en">Slow (Far Range)</span><span class="lang-pt">Lento (Longo Alcance)</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <label for="blur-slider">
+                        <span class="lang-en">Lens Blur (EHT Blur)</span>
+                        <span class="lang-pt">Borrão de Lente (EHT Blur)</span>
+                    </label>
+                    <span id="blur-value" class="value-display">0px</span>
+                </div>
+                <input type="range" id="blur-slider" min="0" max="20" step="0.5" value="0">
+                <div class="slider-labels">
+                    <span class="lang-en">Sharp</span><span class="lang-pt">Nítido</span>
+                    <span class="lang-en">Blurry</span><span class="lang-pt">Borrante</span>
+                </div>
+            </div>
+
+            <!-- Toggles Educacionais -->
+            <div class="toggles-container">
+                <h3>
+                    <span class="lang-en">Active Physics</span>
+                    <span class="lang-pt">Física Ativa</span>
+                </h3>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-lensing" checked>
+                    <span class="slider"></span>
+                    <span class="label-text lang-en">Gravitational Lensing</span>
+                    <span class="label-text lang-pt">Lente Gravitacional</span>
+                </label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-beaming" checked>
+                    <span class="slider"></span>
+                    <span class="label-text lang-en">Doppler Effect / Beaming</span>
+                    <span class="label-text lang-pt">Efeito Doppler / Beaming</span>
+                </label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-redshift" checked>
+                    <span class="slider"></span>
+                    <span class="label-text lang-en">Gravitational Redshift</span>
+                    <span class="label-text lang-pt">Redshift Gravitacional</span>
+                </label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-dragging" checked>
+                    <span class="slider"></span>
+                    <span class="label-text lang-en">Frame Dragging</span>
+                    <span class="label-text lang-pt">Arrasto de Referencial (Frame Dragging)</span>
+                </label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-photon-sphere">
+                    <span class="slider"></span>
+                    <span class="label-text lang-en">Visual Guide: Photon Sphere (r = 3M)</span>
+                    <span class="label-text lang-pt">Guia Visual: Esfera de Fótons (r = 3M)</span>
+                </label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-aa">
+                    <span class="slider"></span>
+                    <span class="label-text lang-en">Anti-Aliasing (SSAA 2x)</span>
+                    <span class="label-text lang-pt">Suavização de Bordas (SSAA 2x)</span>
+                </label>
+            </div>
+        </section>
+
+        <footer>
+            <button id="toggle-theory-btn" class="btn-primary">
+                <span class="lang-en">View Physics Equations</span>
+                <span class="lang-pt">Ver Equações Físicas</span>
+            </button>
+        </footer>
+    </main>
+
+    <!-- Overlay de Equações de Física (Educacional) -->
+    <div id="theory-modal" class="modal hidden">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2>
+                    <span class="lang-en">Scientific Guide: Kerr-Schild Spacetime Geometry</span>
+                    <span class="lang-pt">Guia Científico: Geometria Espaço-Temporal de Kerr-Schild</span>
+                </h2>
+                <button id="close-theory-btn" class="close-btn">&times;</button>
+            </header>
+            <div class="modal-body">
+                <p class="intro">
+                    <span class="lang-en">This simulator calculates the trajectories of photons (null geodesics) traveling through the curved spacetime around a rotating black hole using the Hamiltonian formulation in Kerr-Schild cartesian coordinates.</span>
+                    <span class="lang-pt">Este simulador calcula as trajetórias de fótons (geodésicas nulas) que viajam pelo espaço-tempo curvo ao redor de um buraco negro em rotação usando a formulação hamiltoniana em coordenadas cartesianas de Kerr-Schild.</span>
+                </p>
+                
+                <div class="formula-block">
+                    <h3>
+                        <span class="lang-en">1. The Kerr-Schild Metric</span>
+                        <span class="lang-pt">1. A Métrica de Kerr-Schild</span>
+                    </h3>
+                    <p>
+                        <span class="lang-en">The Kerr-Schild metric expresses the metric tensor $g_{\mu\nu}$ linearly as a perturbation of the flat Minkowski metric $\eta_{\mu\nu}$:</span>
+                        <span class="lang-pt">A métrica de Kerr-Schild expressa o tensor métrico $g_{\mu\nu}$ de forma linear como uma perturbação da métrica plana de Minkowski $\eta_{\mu\nu}$:</span>
+                    </p>
+                    $$g_{\mu\nu} = \eta_{\mu\nu} + f l_\mu l_\nu$$
+                    <p>
+                        <span class="lang-en">where $\eta_{\mu\nu} = \text{diag}(-1, 1, 1, 1)$, the scalar gravitational potential function $f$ and the null vector $l^\mu$ are:</span>
+                        <span class="lang-pt">onde $\eta_{\mu\nu} = \text{diag}(-1, 1, 1, 1)$, a função escalar de potencial gravitacional $f$ e o vetor nulo $l^\mu$ são:</span>
+                    </p>
+                    $$f = \frac{2 M r^3}{r^4 + a^2 z^2}, \quad l^\mu = \left(1, \frac{r x + a y}{r^2 + a^2}, \frac{r y - a x}{r^2 + a^2}, \frac{z}{r}\right)$$
+                    <p>
+                        <span class="lang-en">Here, the oblate Boyer-Lindquist radial coordinate $r$ is solved analytically from $(x, y, z)$ by:</span>
+                        <span class="lang-pt">Aqui, a coordenada radial oblatada de Boyer-Lindquist $r$ é resolvida analiticamente a partir de $(x, y, z)$ por:</span>
+                    </p>
+                    $$r^2 = \frac{1}{2}(R^2 - a^2) + \frac{1}{2}\sqrt{(R^2 - a^2)^2 + 4 a^2 z^2}$$
+                    <p>
+                        <span class="lang-en">where $R^2 = x^2 + y^2 + z^2$ and $a$ is the spin parameter. The outer event horizon is located at radius:</span>
+                        <span class="lang-pt">onde $R^2 = x^2 + y^2 + z^2$ e $a$ é o parâmetro de spin. O horizonte de eventos externo está localizado no raio:</span>
+                    </p>
+                    $$r_+ = M + \sqrt{M^2 - a^2}$$
+                </div>
+
+                <div class="formula-block">
+                    <h3>
+                        <span class="lang-en">2. Hamiltonian Equations of Motion</span>
+                        <span class="lang-pt">2. Equações Hamiltonianas de Movimento</span>
+                    </h3>
+                    <p>
+                        <span class="lang-en">For null geodesics (photons), the trajectory is described by the zero-value Hamiltonian:</span>
+                        <span class="lang-pt">Para geodésicas nulas (fótons), a trajetória é descrita pelo Hamiltoniano de valor nulo:</span>
+                    </p>
+                    $$H(x^\mu, p_\nu) = \frac{1}{2} g^{\mu\nu} p_\mu p_\nu = 0$$
+                    <p>
+                        <span class="lang-en">With $p_t = -1$, the temporal and spatial evolution of the photon and its canonical momenta $p_i$ follow Hamilton's equations:</span>
+                        <span class="lang-pt">Com $p_t = -1$, a evolução temporal e espacial do fóton e seus momentos canônicos $p_i$ seguem as equações de Hamilton:</span>
+                    </p>
+                    $$\frac{dx^i}{d\lambda} = p_i - f l^i (p \cdot l - 1)$$
+                    $$\frac{dp_i}{d\lambda} = \frac{1}{2}(p \cdot l - 1)^2 \partial_i f + f (p \cdot l - 1) p_j \partial_i l^j$$
+                    <p>
+                        <span class="lang-en">where $p \cdot l = \sum_{j=1}^3 p_j l^j - 1$ and the analytical gradients of $f$ and $l^\mu$ are computed directly to avoid coordinate singularities at the poles and horizon.</span>
+                        <span class="lang-pt">onde $p \cdot l = \sum_{j=1}^3 p_j l^j - 1$ e os gradientes analíticos de $f$ e $l^\mu$ são calculados diretamente para evitar singularidades de coordenadas nos polos e horizonte.</span>
+                    </p>
+                </div>
+
+                <div class="formula-block">
+                    <h3>3. Raio ISCO (Innermost Stable Circular Orbit)</h3>
+                    <p>
+                        <span class="lang-en">The matter accretion disk reaches its inner stable limit at the Innermost Stable Circular Orbit (ISCO), given by Bardeen's formula:</span>
+                        <span class="lang-pt">O disco de acreção de matéria atinge seu limite interno estável na órbita circular estável mais interna (ISCO), dada pela fórmula de Bardeen:</span>
+                    </p>
+                    $$r_{ISCO} = M \left(3 + Z_2 - \sqrt{(3 - Z_1)(3 + Z_1 + 2 Z_2)}\right)$$
+                    <p>
+                        <span class="lang-en">where the relativistic factors $Z_1$ and $Z_2$ are:</span>
+                        <span class="lang-pt">onde os fatores relativísticos $Z_1$ e $Z_2$ são:</span>
+                    </p>
+                    $$Z_1 = 1 + (1 - a^2/M^2)^{1/3} \left[(1 + a/M)^{1/3} + (1 - a/M)^{1/3}\right]$$
+                    $$Z_2 = \sqrt{3 a^2/M^2 + Z_1^2}$$
+                </div>
+
+                <div class="formula-block">
+                    <h3>
+                        <span class="lang-en">4. Relativistic Redshift & Doppler Beaming</span>
+                        <span class="lang-pt">4. Redshift Relativístico & Doppler Beaming</span>
+                    </h3>
+                    <p>
+                        <span class="lang-en">Light emitted by gas particles in equatorial Keplerian orbits with angular velocity:</span>
+                        <span class="lang-pt">A luz emitida pelas partículas de gás em órbitas Keplerianas equatoriais com velocidade angular:</span>
+                    </p>
+                    $$\Omega_K = \frac{M^{1/2}}{r^{3/2} + a M^{1/2}}$$
+                    <p>
+                        <span class="lang-en">undergoes spectral shifts due to gravity and the Doppler effect. The observed redshift factor $g = \nu_{obs}/\nu_{emit}$ is:</span>
+                        <span class="lang-pt">sofre desvios espectrais devido à gravidade e ao efeito Doppler. O fator de redshift observado $g = \nu_{obs}/\nu_{emit}$ é:</span>
+                    </p>
+                    $$g = \frac{\sqrt{-(g_{tt} + 2 \Omega_K g_{t\phi} + \Omega_K^2 g_{\phi\phi})}}{\sqrt{1 - f_{cam}} (1 - \Omega_K p_\phi)}$$
+                    <p>
+                        <span class="lang-en">where $p_\phi = x p_y - y p_x$ is the photon's angular momentum. The observed intensity is amplified by $g^4$ (Liouville's Theorem):</span>
+                        <span class="lang-pt">onde $p_\phi = x p_y - y p_x$ é o momento angular do fóton. A intensidade observada é amplificada por $g^4$ (Teorema de Liouville):</span>
+                    </p>
+                    $$I_{obs} = g^4 I_{emit}$$
+                    <p>
+                        <span class="lang-en">This produces the relativistic beaming effect, where the left side of the disk (rotating towards us) shines intensely, and the right side is severely dimmed.</span>
+                        <span class="lang-pt">Isso produz o efeito de beaming relativístico, onde o lado esquerdo do disco (girando em nossa direção) brilha intensamente, e o lado direito é severamente enfraquecido.</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Inicialização da Aplicação -->
+    <script>
+        function setLanguage(lang) {
+            document.documentElement.lang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.lang-btn[onclick="setLanguage('${lang}')"]`).classList.add('active');
+        }
+    </script>
+    <script src="simulator.js"></script>
+</body>
+</html>
