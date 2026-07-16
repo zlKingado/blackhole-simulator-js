@@ -189,7 +189,7 @@ The applied mathematics driving this simulator are drawn from primary General Re
 1. Clone the repository and enter the folder:
    ```bash
    git clone https://github.com/zlkingado/blackhole-simulator-js.git
-   cd blackhole-simulator
+   cd blackhole-simulator-js
    ```
 2. Install dependencies (Express):
    ```bash
