@@ -187,7 +187,7 @@ $$\mathbf{I}_{\text{screen}} = \left(1 - e^{-\mathbf{I}_{\text{accum}} \cdot 1.1
 ### 8.2 Supersampling Antialiasing (SSAA 2x)
 When active, samples 4 sub-pixel locations in a rotated grid pattern per pixel:
 
-$$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{gl\_FragCoord} + \mathbf{offset}_s\right)$$
+$$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\mathbf{p}_s\right)$$
 
 ---
 

@@ -113,7 +113,7 @@ $$\Omega_K(r) = \text{mix}\left(\Omega_{\text{zamo}}, \Omega_{\text{isco}}, \tex
 ## 5. Física do Disco de Acreção Volumétrico
 
 ### 5.1 Perfil Térmico de Novikov-Thorne Normalizado
-A matéria equatorial orbita fora da Órbita Circular Estável Mais Interna (ISCO). O raio ISCO prograde $r_{\text{isco}}$ é calculated pelas equações de Bardeen et al. (1972) com precisão nativa de `Math.cbrt`:
+A matéria equatorial orbita fora da Órbita Circular Estável Mais Interna (ISCO). O raio ISCO prograde $r_{\text{isco}}$ é calculado pelas equações de Bardeen et al. (1972) com precisão nativa de `Math.cbrt`:
 
 $$r_{\text{isco}} = M \left( 3 + x_2 - \sqrt{(3-x_1)(3+x_1+2x_2)} \right)$$
 
@@ -187,7 +187,7 @@ $$\mathbf{I}_{\text{tela}} = \left(1 - e^{-\mathbf{I}_{\text{acum}} \cdot 1.1}\r
 ### 8.2 Antialiasing por Supersampling (SSAA 2x)
 Quando ativo, amostra 4 sub-pixels em padrão de grade rotacionada por pixel:
 
-$$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{gl\_FragCoord} + \mathbf{offset}_s\right)$$
+$$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\mathbf{p}_s\right)$$
 
 ---
 
