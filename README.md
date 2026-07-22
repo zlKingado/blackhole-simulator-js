@@ -168,7 +168,10 @@ For Schwarzschild ($a=0$), $r_{\text{photon}} = 3M$. For maximum Kerr ($a=0.99M$
 Instead of a flat 2D CSS post-processing blur, the simulator incorporates a **Physical Thin-Lens Aperture Model** running directly inside the GPU ray tracer.
 
 When DoF is enabled:
-1. The ray origin is perturbed on the camera lens plane using uniform disk distribution: $\mathbf{P}_{\text{lens}} = \mathbf{P}_{\text{cam}} + r_{\text{aperture}} (\cos\theta \mathbf{R} + \sin\theta \mathbf{U})$.
+1. The ray origin is perturbed on the camera lens plane using uniform disk distribution:
+
+$$\mathbf{P}_{\text{lens}} = \mathbf{P}_{\text{cam}} + r_{\text{aperture}} (\cos\theta \, \mathbf{R} + \sin\theta \, \mathbf{U})$$
+
 2. The ray direction is re-aimed towards the focus target point at distance $D_{\text{focus}} = \|\mathbf{P}_{\text{cam}}\|$.
 3. Subpixel sampling during SSAA 2x naturally acts as a zero-cost Monte Carlo denoiser for the optical bokeh blur.
 
