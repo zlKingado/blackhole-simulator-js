@@ -58,16 +58,25 @@ Para cada pixel da tela:
 Um buraco negro rotativo com massa gravitacional $M$ e spin $J$ é descrito pela métrica de Kerr. O parâmetro de spin adimensional $a = J/M$ ($0 \le a < 1$) rege a rotação e o arrasto de referencial.
 
 Em coordenadas cartesianas de Kerr-Schild $(x,y,z)$, o tensor métrico é decomposto no espaço plano de Minkowski mais um fator métrico escalar $f(r, \theta)$ e um vetor nulo $l_\mu$:
+
 $$g_{\mu\nu} = \eta_{\mu\nu} + f l_\mu l_\nu$$
+
 onde:
+
 $$f(r, \theta) = \frac{2 M r^3}{r^4 + a^2 z^2}$$
+
 $$l_\mu = \left(1, \frac{r x + a y}{r^2 + a^2}, \frac{r y - a x}{r^2 + a^2}, \frac{z}{r}\right)$$
 
 A coordenada radial física $r$ de Kerr é calculada resolvendo a equação oblata:
+
 $$\frac{x^2 + y^2}{r^2 + a^2} + \frac{z^2}{r^2} = 1$$
+
 obtendo a solução quadrática exata:
+
 $$r^2 = \frac{1}{2}\left(R^2 - a^2\right) + \frac{1}{2}\sqrt{\left(R^2 - a^2\right)^2 + 4 a^2 z^2}$$
+
 onde $R^2 = x^2 + y^2 + z^2$. O horizonte de eventos externo localiza-se em:
+
 $$r_+ = M + \sqrt{M^2 - a^2}$$
 
 ---
@@ -75,11 +84,15 @@ $$r_+ = M + \sqrt{M^2 - a^2}$$
 ## 3. Integração das Geodésicas Relativísticas (RK4 Hamiltoniano Conservativo com Passo Adaptativo)
 
 Fótons seguem geodésicas nulas ($ds^2 = 0$). O simulador utiliza a **Formulação Hamiltoniana Conservativa** (Chan, Medeiros & Ozel 2018; Bacchini et al. 2018) em coordenadas de Kerr-Schild para computar as equações de movimento da posição $\mathbf{x}$ e do momento $\mathbf{p}$:
+
 $$\frac{d\mathbf{x}}{d\lambda} = \mathbf{p} - f \mathbf{l} V$$
+
 $$\frac{d\mathbf{p}}{d\lambda} = \frac{1}{2} V^2 \nabla f + f V (\mathbf{p} \cdot \nabla \mathbf{l})$$
+
 onde $V = (\mathbf{p} \cdot \mathbf{l}) - 1$.
 
 A integração é realizada usando o **Método de Runge-Kutta de 4ª Ordem (RK4)** com um **Passo Adaptativo por Gradiente Métrico**:
+
 $$dt_{\text{local}} = dt_{\text{base}} \cdot \frac{\text{clamp}(r / 1.5, 0.25, 40.0)}{1 + 1.2 \|\nabla f\|}$$
 
 Isso refina dinamicamente a precisão matemática perto de gradientes de forte curvatura ($\|\nabla f\|$) e perto do horizonte ($r \to r_+$), enquanto previne erros de penetração no horizonte via proteção dupla por fall-through.
@@ -90,8 +103,9 @@ Isso refina dinamicamente a precisão matemática perto de gradientes de forte c
 
 Quando o buraco negro rotaciona ($a > 0$), o próprio espaço-tempo é arrastado ao redor do eixo central (efeito Lense-Thirring).
 
-1. **Arrasto Geodésico:** As derivadas métricas $\nabla f$ e $\nabla \mathbf{l}$ nas equações hamiltonianas arrastam as trajetórias da luz na direção do spin. Um parâmetro unificado de spin $a_{\text{geo}} = \text{u\_dragging} ? a : 0.0$ garante consistência física entre as geodésicas da luz e a cinemática do disco.
+1. **Arrasto Geodésico:** As derivadas métricas $\nabla f$ e $\nabla \mathbf{l}$ nas equações hamiltonianas arrastam as trajetórias da luz na direção do spin. Um parâmetro eficaz de spin $a_{\text{geo}}$ (definido como $a$ quando o Frame Dragging está ativo e $0.0$ quando inativo) garante consistência física entre a curvatura dos fótons e a cinemática do disco.
 2. **Mistura de Velocidades no Mergulho (Plunge Region):** O plasma dentro da ISCO ($r < r_{\text{isco}}$) não mantém órbitas Keplerianas estáveis. A velocidade angular orbital $\Omega_K$ faz transição suave da velocidade Kepleriana na ISCO ($\Omega_{\text{isco}}$) para a velocidade de arraste ZAMO (Zero Angular Momentum Observer) ($\Omega_{\text{zamo}} = -g_{t\phi}/g_{\phi\phi}$) no horizonte:
+
 $$\Omega_K(r) = \text{mix}\left(\Omega_{\text{zamo}}, \Omega_{\text{isco}}, \text{smoothstep}(r_+, r_{\text{isco}}, r)\right)$$
 
 ---
@@ -100,28 +114,39 @@ $$\Omega_K(r) = \text{mix}\left(\Omega_{\text{zamo}}, \Omega_{\text{isco}}, \tex
 
 ### 5.1 Perfil Térmico de Novikov-Thorne Normalizado
 A matéria equatorial orbita fora da Órbita Circular Estável Mais Interna (ISCO). O raio ISCO prograde $r_{\text{isco}}$ é calculado pelas equações de Bardeen et al. (1972) com precisão nativa de `Math.cbrt`:
+
 $$r_{\text{isco}} = M \left( 3 + x_2 - \sqrt{(3-x_1)(3+x_1+2x_2)} \right)$$
+
 $$x_1 = 1 + \sqrt[3]{1 - a^2} \left( \sqrt[3]{1+a} + \sqrt[3]{1-a} \right)$$
+
 $$x_2 = \sqrt{3 a^2 + x_1^2}$$
 
 A temperatura do plasma segue o perfil relativístico de disco fino de **Novikov-Thorne** (1973):
+
 $$T(r) = T_{\text{peak}} \cdot \left(\frac{r_{\text{isco}}}{r}\right)^{0.75} \cdot \left(1 - \sqrt{\frac{r_{\text{isco}}}{r}}\right)^{0.25} \cdot 2.2$$
 
 ### 5.2 Modelagem Volumétrica 3D do Gás (Lei de Beer-Lambert)
 O disco possui perfil de densidade com decaimento gaussiano vertical, decaimento exponencial radial e ruído de turbulência multi-escala:
+
 $$\rho(r, z) = e^{-0.10(r - r_{\text{isco}})} \cdot e^{-\frac{z^2}{0.08}} \cdot \text{Noise}_{3D}\left(\mathbf{p}_{\text{rot}}\right)$$
 
 O ray marching volumétrico acumula opacidade e emissão ao longo da distância $dt$ usando a **Lei de Beer-Lambert** ($k_{\text{opacidade}} = 6.0$):
+
 $$\Delta \alpha = 1 - e^{-\rho \cdot dt \cdot k_{\text{opacidade}}}$$
+
 $$\mathbf{I}_{\text{acum}} = \mathbf{I}_{\text{acum}} + (1 - \alpha_{\text{acum}}) \cdot \mathbf{C}_{\text{emissao}} \cdot \Delta \alpha$$
 
 ### 5.3 Redshift Gravitacional e Beaming Doppler Covariante
 1. **Redshift Gravitacional e Cinemático ($g_{\text{grav}}$):**
+
 $$g_{\text{grav}} = \frac{g_{\text{obs}}}{u^t_{\text{disc}}}$$
+
 onde $u^t_{\text{disc}} = 1/\sqrt{-(g_{tt} + 2 \Omega_K g_{t\phi} + \Omega_K^2 g_{\phi\phi})}$.
 
 2. **Amplificação Doppler ($g_{\text{doppler}}$):**
+
 $$g_{\text{doppler}} = \frac{1}{\max(0.25, 1 - \Omega_K L_z)}$$
+
 onde $L_z = x p_y - y p_x$ é o momento angular axial de Killing do fóton.
 
 A temperatura observada do plasma $T_{\text{obs}} = g_{\text{fator}} \cdot T(r)$ é mapeada para cor de corpo negro RGB pelo algoritmo de Tanner Helland com escala perceptual de luminosidade para alto alcance dinâmico no WebGL.
@@ -131,6 +156,7 @@ A temperatura observada do plasma $T_{\text{obs}} = g_{\text{fator}} \cdot T(r)$
 ## 6. Guia Visual: Esfera de Fótons Exata de Kerr (Bardeen 1972 / Teo 2003)
 
 Quando ativada na interface, uma grade visual 3D destaca o raio analítico exato da órbita esférica de fótons derivada por Bardeen et al. (1972) e Teo (2003):
+
 $$r_{\text{foton}} = 2 M \left(1 + \cos\left(\frac{2}{3} \arccos(-a_{\text{geo}} / M)\right)\right)$$
 
 Para Schwarzschild ($a=0$), $r_{\text{foton}} = 3M$. Para Kerr máximo ($a=0.99M$), $r_{\text{foton}}$ ajusta-se analiticamente para $1.17M$.
@@ -152,10 +178,12 @@ Quando o DoF está ativo:
 
 ### 8.1 Mapeamento de Tom Fílmico ACES com Exposição
 Para evitar estouro de branco em regiões de altíssimo Doppler mantendo os degradês avermelhados de corpo negro, o shader utiliza um mapeamento de tom fílmico expositivo:
+
 $$\mathbf{I}_{\text{tela}} = \left(1 - e^{-\mathbf{I}_{\text{acum}} \cdot 1.1}\right)^{\frac{1}{2.2}}$$
 
-### 8.2 Antialiasing por Supersampling (SSAA 2x)
+### 8.2 Supersampling Antialiasing (SSAA 2x)
 Quando ativo, amostra 4 sub-pixels em padrão de grade rotacionada por pixel:
+
 $$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{gl\_FragCoord} + \mathbf{offset}_s\right)$$
 
 ---
@@ -192,7 +220,7 @@ $$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{g
    ```bash
    npm start
    ```
-4. Abra o navegador em **`http://localhost:3000`** (ou abra `public/index.html` diretamente).
+4. Abra o navegador em **`http://localhost:3000`** (or abra `public/index.html` diretamente).
 
 ---
 
