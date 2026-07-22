@@ -95,8 +95,9 @@ function updateUI() {
     outerValue.textContent = parseFloat(outerSlider.value).toFixed(1) + 'M';
     stepValue.textContent = parseFloat(stepSlider.value).toFixed(2);
     iterValue.textContent = iterSlider.value;
-    blurValue.textContent = parseFloat(blurSlider.value).toFixed(1) + 'px';
-    canvas.style.filter = `blur(${blurSlider.value}px)`;
+    const blurVal = parseFloat(blurSlider.value);
+    blurValue.textContent = blurVal.toFixed(1) + (blurVal > 0 ? ' (DoF)' : '');
+    canvas.style.filter = 'none';
 }
 
 // EN: Attach updateUI listeners to all interactive controls / PT: Registra listeners de atualização para todos os controles
@@ -236,6 +237,7 @@ uniform float u_outerRadius;
 uniform float u_isco;
 uniform float u_dt;
 uniform float u_time;
+uniform float u_dof;
 
 // EN: Physical Feature Switches & Integrator Settings / PT: Toggles Físicos e Configuração do Integrador
 uniform bool u_lensing;
@@ -451,6 +453,22 @@ vec3 renderPixel(vec2 uv) {
     float a_geo = u_dragging ? a : 0.0;
     vec3 pos = u_camPos;
 
+    // EN: Physical GPU Depth-of-Field (Bokeh Lens Aperture Simulation)
+    // PT: Profundidade de Campo Física na GPU (Simulação de Abertura de Lente Bokeh)
+    if (u_dof > 0.001) {
+        float focusDist = length(u_camPos);
+        vec3 focusTarget = pos + rd * focusDist;
+
+        float rnd1 = hash(vec3(uv * 100.0, u_time));
+        float rnd2 = hash(vec3(uv * 50.0 + 1.5, u_time * 1.3));
+        float noiseAngle = rnd1 * 6.2831853;
+        float noiseRadius = sqrt(rnd2) * u_dof * 0.45;
+
+        vec3 lensOffset = noiseRadius * (cos(noiseAngle) * u_camRight + sin(noiseAngle) * u_camUp);
+        pos += lensOffset;
+        rd = normalize(focusTarget - pos);
+    }
+
     // EN: Initial metric setup at observer location / PT: Configuração da métrica inicial na posição do observador
     float r_cam, Sigma_cam, f_cam;
     vec3 df_cam;
@@ -474,7 +492,8 @@ vec3 renderPixel(vec2 uv) {
     float k = (-f_cam * A_cam + sqrt(max(0.0, disc_k))) / denom;
     vec3 mom = k * rd;
 
-    // EN: Conserved z-component of angular momentum L_z / PT: Componente z conservada do momento angular L_z
+    // EN: Conserved axial Killing angular momentum L_z = p_phi (exact invariant along photon geodesic in Kerr metric at r >> M)
+    // PT: Momento angular axial conservado de Killing L_z = p_phi (invariante exato ao longo da geodésica em Kerr para r >> M)
     float L_z = u_camPos.x * mom.y - u_camPos.y * mom.x;
 
     // EN: Observer redshift factor g_obs / PT: Fator de redshift do observador g_obs
@@ -500,7 +519,7 @@ vec3 renderPixel(vec2 uv) {
         // EN: Outer Event Horizon r_h = M + sqrt(M^2 - a^2) / PT: Horizonte de Eventos Externo r_h
         float r_h = M + sqrt(max(0.0, M*M - a_geo*a_geo));
         float r_eff = boyerLindquistR(pos, a_geo);
-        float r_horizon_threshold = r_h + 0.02;
+        float r_horizon_threshold = r_h + 0.04;
 
         // EN: Horizon capture check / PT: Verificação de captura pelo horizonte de eventos
         if (r_eff <= r_horizon_threshold) {
@@ -508,14 +527,18 @@ vec3 renderPixel(vec2 uv) {
             break;
         }
 
-        // EN: Adaptive step size optimization / PT: Passo de integração adaptativo
-        float current_dt = u_dt * clamp(r / 1.5, 0.2, 50.0);
-        if (r < 3.5 * M) {
-            float distToHorizon = max(0.01, r - r_h);
-            current_dt *= clamp(distToHorizon / (3.5 * M - r_h), 0.05, 1.0);
+        // EN: Metric Gradient-Based Adaptive Step Size Optimization
+        // PT: Passo de integração adaptativo baseado no gradiente de curvatura da métrica
+        float grad_f_mag = length(df);
+        float curvature_factor = 1.0 / (1.0 + 1.2 * grad_f_mag);
+        float current_dt = u_dt * clamp(r / 1.5, 0.25, 40.0) * curvature_factor;
+
+        if (r_eff < 3.5 * M) {
+            float distToHorizon = max(0.01, r_eff - r_h);
+            current_dt *= clamp(distToHorizon / (3.5 * M - r_h), 0.2, 1.0);
         }
-        if (abs(pos.z) < 1.2 && r >= u_isco - 0.5 && r <= u_outerRadius + 2.0) {
-            current_dt = min(current_dt, u_dt * 3.0);
+        if (abs(pos.z) < 1.2 && r_eff >= u_isco - 0.5 && r_eff <= u_outerRadius + 2.0) {
+            current_dt = min(current_dt, u_dt * 2.0);
         }
 
         vec3 prev_pos = pos;
@@ -549,14 +572,10 @@ vec3 renderPixel(vec2 uv) {
             next_mom = mom;
         }
 
-        // EN: Photon Sphere Visual Shell Indicator / PT: Indicador Visual da Esfera de Fótons
+        // EN: Exact Analytical Photon Sphere Radius (Bardeen 1972 / Teo 2003)
+        // PT: Raio Analítico Exato da Esfera de Fótons (Bardeen 1972 / Teo 2003)
         if (u_showPhotonSphere) {
-            float r_photon;
-            if (u_dragging) {
-                r_photon = 2.0 * M * (1.0 + cos((2.0 / 3.0) * acos(clamp(-a / M, -0.999, 0.999))));
-            } else {
-                r_photon = 3.0 * M;
-            }
+            float r_photon = 2.0 * M * (1.0 + cos((2.0 / 3.0) * acos(clamp(-a_geo / M, -0.999, 0.999))));
             float r_prev_BL = boyerLindquistR(prev_pos, a_geo);
             float r_curr_BL = boyerLindquistR(next_pos, a_geo);
 
@@ -585,88 +604,80 @@ vec3 renderPixel(vec2 uv) {
 
         // EN: Volumetric Accretion Disk Thermodynamics & Radiative Transfer
         // PT: Termodinâmica e Transferência Radiativa do Disco de Acreção Volumétrico
-        float r_disk = boyerLindquistR(next_pos, a);
+        float r_disk = boyerLindquistR(next_pos, a_geo);
         float H = 0.8;
 
         if (abs(next_pos.z) < H && r_disk > r_horizon_threshold && r_disk <= u_outerRadius) {
 
-            // EN: Compute Orbital Velocity Omega_K (Keplerian or Plunge Region ZAMO blend)
-            // PT: Computa Velocidade Orbital Omega_K (Kepleriana ou mistura ZAMO na região de mergulho)
+            // EN: Compute Orbital Velocity Omega_K (Keplerian or Plunge Region ZAMO blend using synchronized spin a_geo)
+            // PT: Computa Velocidade Orbital Omega_K (Kepleriana ou mistura ZAMO usando spin sincronizado a_geo)
             float Omega_K;
-            if (u_dragging) {
-                if (r_disk >= u_isco) {
-                    Omega_K = keplerianOmega(r_disk, M, a);
-                } else {
-                    float Omega_isco = keplerianOmega(max(0.1, u_isco), M, a);
-                    float Omega_zamo = zamoOmega(r_disk, M, a);
-                    float t_blend = smoothstep(r_horizon_threshold, u_isco, r_disk);
-                    Omega_K = mix(Omega_zamo, Omega_isco, t_blend);
-                }
+            if (r_disk >= u_isco) {
+                Omega_K = keplerianOmega(r_disk, M, a_geo);
             } else {
-                if (r_disk >= u_isco) {
-                    Omega_K = keplerianOmegaSchwarzschild(r_disk, M);
-                } else {
-                    float Omega_isco = keplerianOmegaSchwarzschild(max(0.1, u_isco), M);
-                    float t_blend = smoothstep(r_horizon_threshold, u_isco, r_disk);
-                    Omega_K = mix(0.0, Omega_isco, t_blend);
-                }
+                float Omega_isco = keplerianOmega(max(0.1, u_isco), M, a_geo);
+                float Omega_zamo = zamoOmega(r_disk, M, a_geo);
+                float t_blend = smoothstep(r_horizon_threshold, u_isco, r_disk);
+                Omega_K = mix(Omega_zamo, Omega_isco, t_blend);
             }
 
             float g_factor = 1.0;
 
-            // EN: Relativistic Gravitational Redshift g_emit / PT: Redshift Gravitacional Relativístico g_emit
-            if (u_redshift) {
+            // EN: Rigorous Kerr Relativistic Redshift & Relativistic Doppler Beaming Factor
+            // PT: Redshift Relativístico Rigoroso de Kerr e Fator Doppler Relativístico
+            if (u_redshift || u_beaming) {
                 float g_tt = -(1.0 - 2.0 * M / r_disk);
-                float g_tphi = -2.0 * M * a / r_disk;
-                float g_phiphi = r_disk * r_disk + a * a + 2.0 * M * a * a / r_disk;
+                float g_tphi = -2.0 * M * a_geo / r_disk;
+                float g_phiphi = r_disk * r_disk + a_geo * a_geo + 2.0 * M * a_geo * a_geo / r_disk;
 
                 float u_t_inv_sq = -(g_tt + 2.0 * Omega_K * g_tphi + Omega_K * Omega_K * g_phiphi);
-                float g_emit = sqrt(max(0.001, u_t_inv_sq));
+                float u_t = 1.0 / sqrt(max(0.0001, u_t_inv_sq));
 
-                g_factor = g_obs * g_emit;
+                float g_grav = 1.0;
+                if (u_redshift) {
+                    g_grav = g_obs / u_t;
+                }
+
+                float dop_factor = 1.0;
+                if (u_beaming) {
+                    float dop_denom = max(0.25, 1.0 - Omega_K * L_z);
+                    dop_factor = clamp(1.0 / dop_denom, 0.4, 2.0);
+                }
+
+                g_factor = g_grav * dop_factor;
             }
-
-            // EN: Relativistic Doppler Beaming g_doppler / PT: Amplificação por Doppler Relativístico g_doppler
-            if (u_beaming) {
-                float dop_denom = 1.0 - Omega_K * L_z;
-                dop_denom = max(dop_denom, 0.02);
-                float g_doppler = 1.0 / dop_denom;
-                g_factor *= g_doppler;
-            }
-
-            g_factor = clamp(g_factor, 0.05, 3.0);
 
             // EN: Novikov-Thorne Temperature Profile T(r) / PT: Perfil de Temperatura Novikov-Thorne T(r)
             float peak_r = max(0.1, u_isco) * 1.36;
             float rr = max(r_disk, peak_r) / max(0.1, u_isco);
             float T_profile = pow(1.0 / rr, 0.75) * pow(max(0.001, 1.0 - sqrt(1.0 / rr)), 0.25);
-            float T = u_temp * T_profile * 2.2;
+            float T = u_temp * T_profile * 1.6;
             float T_obs = g_factor * T;
 
-            // EN: Blackbody emission color & Stefan-Boltzmann luminosity scaling
-            // PT: Cor de emissão de corpo negro e brilho baseado na lei de Stefan-Boltzmann
+            // EN: Blackbody emission color & perceptual luminosity scaling
+            // PT: Cor de emissão de corpo negro e escala perceptual de luminosidade
             vec3 col = blackbody(T_obs);
-            float brightness = pow(clamp(T_obs / 5000.0, 0.0, 5.0), 4.0) * 0.5;
+            float brightness = pow(clamp(T_obs / 4500.0, 0.2, 4.0), 2.4) * 0.75;
 
             // EN: Gaussian vertical decay and exponential radial density
             // PT: Decaimento gaussiano vertical e densidade radial exponencial
-            float vertical_decay = exp(-(next_pos.z * next_pos.z) / 0.06);
+            float vertical_decay = exp(-(next_pos.z * next_pos.z) / 0.08);
             float radial_decay;
             if (r_disk >= u_isco) {
-                radial_decay = exp(-0.15 * (r_disk - u_isco));
+                radial_decay = exp(-0.10 * (r_disk - u_isco));
             } else {
                 radial_decay = smoothstep(r_horizon_threshold, u_isco, r_disk);
             }
 
             float density = radial_decay * vertical_decay;
-            float pattern = 0.4 + 0.6 * getDiskNoise(next_pos, Omega_K);
+            float pattern = 0.35 + 0.65 * getDiskNoise(next_pos, Omega_K);
             density *= pattern;
 
             // EN: Beer-Lambert Volumetric Absorption and Step Emission
             // PT: Absorção Volumétrica pela lei de Beer-Lambert e Emissão por Passo
-            float opacity_coef = 3.5;
+            float opacity_coef = 6.0;
             float step_alpha = 1.0 - exp(-density * current_dt * opacity_coef);
-            vec3 step_emission = col * brightness * step_alpha * (12.0 / opacity_coef);
+            vec3 step_emission = col * brightness * step_alpha * (10.0 / opacity_coef);
 
             accumCol += (1.0 - accumAlpha) * step_emission;
             accumAlpha += (1.0 - accumAlpha) * step_alpha;
@@ -678,6 +689,13 @@ vec3 renderPixel(vec2 uv) {
 
         pos = next_pos;
         mom = next_mom;
+
+        // EN: Fall-through horizon trap protection for rays captured by black hole gravity
+        // PT: Proteção de captura pelo horizonte para raios atraídos pela gravidade do buraco negro
+        if (r_eff < r_h + 0.15 || (i >= u_max_iters - 1 && r_eff < 2.5 * M)) {
+            accumAlpha = 1.0;
+            break;
+        }
 
         // EN: Dynamic escape radius scaling with camera distance / PT: Raio de escape dinâmico escalando com a distância da câmera
         float camDist = length(u_camPos);
@@ -720,10 +738,10 @@ void main() {
         finalCol = renderPixel(uv);
     }
 
-    // EN: Reinhard Tone Mapping & sRGB Gamma Correction (gamma = 2.2)
-    // PT: Mapeamento de Tom de Reinhard e Correção de Gama sRGB (gama = 2.2)
-    finalCol = finalCol / (finalCol + vec3(1.0));
-    finalCol = pow(finalCol, vec3(1.0 / 2.2));
+    // EN: Filmic Exposure Tone Mapping & sRGB Gamma Correction (gamma = 2.2)
+    // PT: Mapeamento de Tom Fílmico com Exposição e Correção de Gama sRGB (gama = 2.2)
+    vec3 exposureCol = vec3(1.0) - exp(-finalCol * 1.1);
+    finalCol = pow(exposureCol, vec3(1.0 / 2.2));
 
     gl_FragColor = vec4(finalCol, 1.0);
 }
@@ -793,6 +811,7 @@ const outerRadiusLocation = gl.getUniformLocation(program, 'u_outerRadius');
 const iscoLocation = gl.getUniformLocation(program, 'u_isco');
 const dtLocation = gl.getUniformLocation(program, 'u_dt');
 const timeLocation = gl.getUniformLocation(program, 'u_time');
+const dofLocation = gl.getUniformLocation(program, 'u_dof');
 const iterLocation = gl.getUniformLocation(program, 'u_max_iters');
 
 const lensingLocation = gl.getUniformLocation(program, 'u_lensing');
@@ -901,6 +920,7 @@ function render() {
 
     const time = (Date.now() - startTime) / 1000.0;
     gl.uniform1f(timeLocation, time);
+    gl.uniform1f(dofLocation, parseFloat(blurSlider.value) / 10.0);
 
     gl.uniform1i(lensingLocation, toggleLensing.checked);
     gl.uniform1i(beamingLocation, toggleBeaming.checked);

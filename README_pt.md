@@ -4,9 +4,9 @@
 
 > Um simulador interativo de **Buraco Negro Rotativo (Kerr)**, rodando 100% no navegador. Desenvolvido em **HTML5, Javascript e WebGL (Fragment Shader)**, ele realiza traçado de raios reverso (reverse ray tracing) resolvendo numericamente geodésicas nulas de fótons no espaço-tempo curvo de Kerr.
 
-A simulação incorpora geodésicas completas de Kerr usando formulação hamiltoniana conservativa em coordenadas de Kerr-Schild, integrador numérico RK4 de alta precisão, disco de acreção volumétrico com termodinâmica de Novikov-Thorne, esferas de fótons de Kerr com anéis de Einstein, Amplificação por Doppler Relativístico (Beaming), Redshift Gravitacional e Antialiasing por Supersampling (SSAA 2x).
+A simulação incorpora geodésicas completas de Kerr usando formulação hamiltoniana conservativa em coordenadas de Kerr-Schild, integrador numérico RK4 com passo adaptativo por gradiente métrico, disco de acreção volumétrico 3D com termodinâmica de Novikov-Thorne, esferas de fótons de Kerr com anéis de Einstein, Amplificação por Doppler Relativístico, Redshift Gravitacional, Profundidade de Campo Física na GPU (Bokeh DoF), Mapeamento de Tom Fílmico ACES e Antialiasing por Supersampling (SSAA 2x).
 
-> **Aviso:** Este é um projeto de hobby independente. Não sou físico acadêmico ou engenheiro de software especialista. O código foi feito com paixão pela astronomia, incorporando equações rigorosas de relatividade geral e aproximações numéricas eficientes. Modifique e estude por sua conta e risco!
+> **Aviso:** Este é um projeto de hobby independente construído por paixão pela astrofísica e relatividade geral. O código incorpora equações teóricas rigorosas (Bardeen 1972, Teo 2003, Chan 2018, Bacchini 2018) aliadas a otimizações numéricas na GPU e escala de brilho perceptual.
 
 ---
 
@@ -15,7 +15,7 @@ A simulação incorpora geodésicas completas de Kerr usando formulação hamilt
 <p align="center">
   <img src="image.png" alt="Gargantua Black Hole">
   <br>
-  <i>Renderização em tempo real na GPU do buraco negro supermassivo.</i>
+  <i>Renderização em tempo real na GPU do buraco negro supermassivo de Kerr.</i>
 </p>
 
 ---
@@ -23,15 +23,15 @@ A simulação incorpora geodésicas completas de Kerr usando formulação hamilt
 ## Sumário
 1. [Metodologia de Renderização (Ray Tracing Reverso)](#1-metodologia-de-renderizacao-ray-tracing-reverso)
 2. [Geometria do Espaço-Tempo de Kerr-Schild](#2-geometria-do-espaco-tempo-de-kerr-schild)
-3. [Integração das Geodésicas Relativísticas (RK4 Hamiltoniano Conservativo)](#3-integracao-das-geodesicas-relativisticas-rk4-hamiltoniano-conservativo)
+3. [Integração das Geodésicas Relativísticas (RK4 Hamiltoniano Conservativo com Passo Adaptativo)](#3-integracao-das-geodesicas-relativisticas-rk4-hamiltoniano-conservativo-com-passo-adaptativo)
 4. [Arrasto de Referencial (Frame Dragging) e Movimento no Mergulho ZAMO](#4-arrasto-de-referencial-frame-dragging-e-movimento-no-mergulho-zamo)
 5. [Física do Disco de Acreção Volumétrico](#5-fisica-do-disco-de-acrecao-volumetrico)
    - [Perfil Térmico de Novikov-Thorne Normalizado](#51-perfil-termico-de-novikov-thorne-normalizado)
    - [Modelagem Volumétrica 3D do Gás (Lei de Beer-Lambert)](#52-modelagem-volumetrica-3d-do-gas-lei-de-beer-lambert)
-   - [Luminosidade de Stefan-Boltzmann e Redshift/Beaming Relativístico](#53-luminosidade-de-stefan-boltzmann-e-redshiftbeaming-relativistico)
-6. [Guia Visual: Esfera de Fótons Dinâmica de Kerr](#6-guia-visual-esfera-de-fotons-dinamica-de-kerr)
-7. [Otimizações de GPU e Raio de Escape Dinâmico](#7-otimizacoes-de-gpu-e-raio-de-escape-dinamico)
-8. [Filtro de Borrão EHT e Antialiasing (SSAA 2x)](#8-filtro-de-borrao-eht-e-antialiasing-ssaa-2x)
+   - [Redshift Gravitacional e Beaming Doppler Covariante](#53-redshift-gravitacional-e-beaming-doppler-covariante)
+6. [Guia Visual: Esfera de Fótons Exata de Kerr (Bardeen 1972 / Teo 2003)](#6-guia-visual-esfera-de-fotons-exata-de-kerr-bardeen-1972--teo-2003)
+7. [Profundidade de Campo Física na GPU (Bokeh de Abertura de Lente)](#7-profundidade-de-campo-fisica-na-gpu-bokeh-de-abertura-de-lente)
+8. [Mapeamento de Tom Fílmico e Antialiasing (SSAA 2x)](#8-mapeamento-de-tom-filmico-e-antialiasing-ssaa-2x)
 9. [Referências Científicas](#9-referencias-cientificas)
 10. [Instalação e Execução](#10-instalacao-e-execucao)
 
@@ -46,7 +46,7 @@ Em vez de simular fótons emitidos do disco de acreção em todas as direções 
 Para cada pixel da tela:
 1. As coordenadas 2D da tela são mapeadas para um vetor tridimensional de direção inicial do fóton $\mathbf{n}$.
 2. O momento canônico inicial do fóton $\mathbf{p}$ é calculado na posição do observador com base no tensor métrico de Kerr-Schild $f(r, \theta)$ e no vetor nulo $\mathbf{l}$.
-3. A trajetória geodésica nula é integrada numericamente passo a passo pelo método Runge-Kutta de 4ª Ordem (RK4).
+3. A trajetória geodésica nula é integrada numericamente passo a passo pelo método Runge-Kutta de 4ª Ordem (RK4) com passo adaptativo por gradiente métrico.
 4. Conforme o fóton caminha, ele acumula emissão e opacidade do disco de acreção 3D pela lei de Beer-Lambert.
 5. Se o fóton entra no horizonte de eventos externo ($r_{\text{eff}} \le r_+ = M + \sqrt{M^2 - a^2}$), a integração cessa imediatamente e o pixel é marcado como sombra do buraco negro.
 6. Se o fóton escapa para distâncias radiais maiores que o limite de escape dinâmico ($R^2 > R_{\text{escape}}^2$), o momento final é usado para amostrar o fundo de estrelas procedurais e poeira galáctica.
@@ -72,22 +72,17 @@ $$r_+ = M + \sqrt{M^2 - a^2}$$
 
 ---
 
-## 3. Integração das Geodésicas Relativísticas (RK4 Hamiltoniano Conservativo)
+## 3. Integração das Geodésicas Relativísticas (RK4 Hamiltoniano Conservativo com Passo Adaptativo)
 
 Fótons seguem geodésicas nulas ($ds^2 = 0$). O simulador utiliza a **Formulação Hamiltoniana Conservativa** (Chan, Medeiros & Ozel 2018; Bacchini et al. 2018) em coordenadas de Kerr-Schild para computar as equações de movimento da posição $\mathbf{x}$ e do momento $\mathbf{p}$:
 $$\frac{d\mathbf{x}}{d\lambda} = \mathbf{p} - f \mathbf{l} V$$
 $$\frac{d\mathbf{p}}{d\lambda} = \frac{1}{2} V^2 \nabla f + f V (\mathbf{p} \cdot \nabla \mathbf{l})$$
 onde $V = (\mathbf{p} \cdot \mathbf{l}) - 1$.
 
-A integração é realizada usando o **Método de Runge-Kutta de 4ª Ordem (RK4)**:
-- $k_1 = g(\mathbf{x}, \mathbf{p})$
-- $k_2 = g\left(\mathbf{x} + \frac{dt}{2} k_{1,x}, \mathbf{p} + \frac{dt}{2} k_{1,p}\right)$
-- $k_3 = g\left(\mathbf{x} + \frac{dt}{2} k_{2,x}, \mathbf{p} + \frac{dt}{2} k_{2,p}\right)$
-- $k_4 = g\left(\mathbf{x} + dt \cdot k_{3,x}, \mathbf{p} + dt \cdot k_{3,p}\right)$
-- $\mathbf{x}_{\text{next}} = \mathbf{x} + \frac{dt}{6} (k_{1,x} + 2 k_{2,x} + 2 k_{3,x} + k_{4,x})$
-- $\mathbf{p}_{\text{next}} = \mathbf{p} + \frac{dt}{6} (k_{1,p} + 2 k_{2,p} + 2 k_{3,p} + k_{4,p})$
+A integração é realizada usando o **Método de Runge-Kutta de 4ª Ordem (RK4)** com um **Passo Adaptativo por Gradiente Métrico**:
+$$dt_{\text{local}} = dt_{\text{base}} \cdot \frac{\text{clamp}(r / 1.5, 0.25, 40.0)}{1 + 1.2 \|\nabla f\|}$$
 
-O passo de integração adaptativo ($dt_{\text{local}}$) refina a resolução perto do horizonte de eventos e perto do plano médio do disco ($|z| < 1.2M$).
+Isso refina dinamicamente a precisão matemática perto de gradientes de forte curvatura ($\|\nabla f\|$) e perto do horizonte ($r \to r_+$), enquanto previne erros de penetração no horizonte via proteção dupla por fall-through.
 
 ---
 
@@ -95,7 +90,7 @@ O passo de integração adaptativo ($dt_{\text{local}}$) refina a resolução pe
 
 Quando o buraco negro rotaciona ($a > 0$), o próprio espaço-tempo é arrastado ao redor do eixo central (efeito Lense-Thirring).
 
-1. **Arrasto Geodésico:** As derivadas métricas $\nabla f$ e $\nabla \mathbf{l}$ nas equações hamiltonianas arrastam as trajetórias da luz na direção do spin.
+1. **Arrasto Geodésico:** As derivadas métricas $\nabla f$ e $\nabla \mathbf{l}$ nas equações hamiltonianas arrastam as trajetórias da luz na direção do spin. Um parâmetro unificado de spin $a_{\text{geo}} = \text{u\_dragging} ? a : 0.0$ garante consistência física entre as geodésicas da luz e a cinemática do disco.
 2. **Mistura de Velocidades no Mergulho (Plunge Region):** O plasma dentro da ISCO ($r < r_{\text{isco}}$) não mantém órbitas Keplerianas estáveis. A velocidade angular orbital $\Omega_K$ faz transição suave da velocidade Kepleriana na ISCO ($\Omega_{\text{isco}}$) para a velocidade de arraste ZAMO (Zero Angular Momentum Observer) ($\Omega_{\text{zamo}} = -g_{t\phi}/g_{\phi\phi}$) no horizonte:
 $$\Omega_K(r) = \text{mix}\left(\Omega_{\text{zamo}}, \Omega_{\text{isco}}, \text{smoothstep}(r_+, r_{\text{isco}}, r)\right)$$
 
@@ -113,48 +108,51 @@ A temperatura do plasma segue o perfil relativístico de disco fino de **Novikov
 $$T(r) = T_{\text{peak}} \cdot \left(\frac{r_{\text{isco}}}{r}\right)^{0.75} \cdot \left(1 - \sqrt{\frac{r_{\text{isco}}}{r}}\right)^{0.25} \cdot 2.2$$
 
 ### 5.2 Modelagem Volumétrica 3D do Gás (Lei de Beer-Lambert)
-O disco possui espessura finita $H = 0.8M$, com decaimento gaussiano vertical e exponencial radial:
-$$\rho(r, z) = e^{-0.15(r - r_{\text{isco}})} \cdot e^{-\frac{z^2}{0.06}} \cdot \text{Noise}_{3D}\left(\mathbf{p}_{\text{rot}}\right)$$
+O disco possui perfil de densidade com decaimento gaussiano vertical, decaimento exponencial radial e ruído de turbulência multi-escala:
+$$\rho(r, z) = e^{-0.10(r - r_{\text{isco}})} \cdot e^{-\frac{z^2}{0.08}} \cdot \text{Noise}_{3D}\left(\mathbf{p}_{\text{rot}}\right)$$
 
-O ray marching volumétrico acumula opacidade e emissão ao longo da distância $dt$ usando a **Lei de Beer-Lambert**:
+O ray marching volumétrico acumula opacidade e emissão ao longo da distância $dt$ usando a **Lei de Beer-Lambert** ($k_{\text{opacidade}} = 6.0$):
 $$\Delta \alpha = 1 - e^{-\rho \cdot dt \cdot k_{\text{opacidade}}}$$
 $$\mathbf{I}_{\text{acum}} = \mathbf{I}_{\text{acum}} + (1 - \alpha_{\text{acum}}) \cdot \mathbf{C}_{\text{emissao}} \cdot \Delta \alpha$$
 
-### 5.3 Luminosidade de Stefan-Boltzmann e Redshift/Beaming Relativístico
-1. **Redshift Gravitacional e Cinemático ($g_{\text{emit}}$):**
-$$g_{\text{emit}} = \sqrt{- (g_{tt} + 2 \Omega_K g_{t\phi} + \Omega_K^2 g_{\phi\phi})}$$
-$$g_{\text{fator}} = g_{\text{obs}} \cdot g_{\text{emit}} \cdot g_{\text{doppler}}$$
+### 5.3 Redshift Gravitacional e Beaming Doppler Covariante
+1. **Redshift Gravitacional e Cinemático ($g_{\text{grav}}$):**
+$$g_{\text{grav}} = \frac{g_{\text{obs}}}{u^t_{\text{disc}}}$$
+onde $u^t_{\text{disc}} = 1/\sqrt{-(g_{tt} + 2 \Omega_K g_{t\phi} + \Omega_K^2 g_{\phi\phi})}$.
 
 2. **Amplificação Doppler ($g_{\text{doppler}}$):**
-$$g_{\text{doppler}} = \frac{1}{1 - \Omega_K L_z}$$
-onde $L_z = x p_y - y p_x$ é a componente z conservada do momento angular do fóton.
+$$g_{\text{doppler}} = \frac{1}{\max(0.25, 1 - \Omega_K L_z)}$$
+onde $L_z = x p_y - y p_x$ é o momento angular axial de Killing do fóton.
 
-A temperatura observada do plasma resulta em $T_{\text{obs}} = g_{\text{fator}} \cdot T(r)$, mapeada para emissão de corpo negro RGB pelo algoritmo de Tanner Helland. A luminosidade escala pela lei de Stefan-Boltzmann ($\propto T_{\text{obs}}^4$).
-
----
-
-## 6. Guia Visual: Esfera de Fótons Dinâmica de Kerr
-
-Quando ativada na interface, uma grade visual destaca a esfera de órbitas esféricas instáveis de fótons. Na métrica de Kerr, o raio dessa esfera varia entre $1.5M$ (prograde) e $4.0M$ (retrograde).
-
-Quando a trajetória do fóton passa perto dessa borda ($r \approx r_{\text{foton}}$), uma aura ciano ($\text{RGB} = [0.0, 0.85, 1.0]$) com linhas de latitude e longitude é desenhada na integração do raio.
+A temperatura observada do plasma $T_{\text{obs}} = g_{\text{fator}} \cdot T(r)$ é mapeada para cor de corpo negro RGB pelo algoritmo de Tanner Helland com escala perceptual de luminosidade para alto alcance dinâmico no WebGL.
 
 ---
 
-## 7. Otimizações de GPU e Raio de Escape Dinâmico
+## 6. Guia Visual: Esfera de Fótons Exata de Kerr (Bardeen 1972 / Teo 2003)
 
-1. **Escala de Resolução:** Resoluções superiores a 1080p são limitadas ao máximo de $1920 \times 1080$ pixels para garantir 60 FPS fluidos em telas High-DPI.
-2. **Raio de Escape Dinâmico:** O raio limite de escape para estrelas de fundo escala com a distância da câmera:
-$$R_{\text{escape}}^2 = \max(900.0, 2.0 \cdot |\mathbf{x}_{\text{câmera}}|^2)$$
-Isso permite afastar a câmera até $80.0M$ sem cortes no fundo estrelado ou manchas pretas.
-3. **Suporte Touch em Dispositivos Móveis:** Suporta arrasto de um dedo para orbitar inclinação/azimute e gesto de pinch com dois dedos para controlar a distância de zoom.
+Quando ativada na interface, uma grade visual 3D destaca o raio analítico exato da órbita esférica de fótons derivada por Bardeen et al. (1972) e Teo (2003):
+$$r_{\text{foton}} = 2 M \left(1 + \cos\left(\frac{2}{3} \arccos(-a_{\text{geo}} / M)\right)\right)$$
+
+Para Schwarzschild ($a=0$), $r_{\text{foton}} = 3M$. Para Kerr máximo ($a=0.99M$), $r_{\text{foton}}$ ajusta-se analiticamente para $1.17M$.
 
 ---
 
-## 8. Filtro de Borrão EHT e Antialiasing (SSAA 2x)
+## 7. Profundidade de Campo Física na GPU (Bokeh de Abertura de Lente)
 
-### 8.1 Filtro de Borrão de Lente (EHT Blur)
-Emula o limite de resolução angular do Event Horizon Telescope (EHT) através de um slider de borrão gaussiano acelerado na GPU (até 20px) aplicado no canvas.
+Em vez de um desfoque 2D plano por CSS, o simulador incorpora um modelo de **Abertura de Lente Fina Física** rodando diretamente no fragment shader do WebGL.
+
+Quando o DoF está ativo:
+1. A origem do raio é perturbada no plano da lente da câmera usando amostragem uniforme de disco: $\mathbf{P}_{\text{lente}} = \mathbf{P}_{\text{câmera}} + r_{\text{abertura}} (\cos\theta \mathbf{R} + \sin\theta \mathbf{U})$.
+2. A direção do raio é reapontada para o ponto alvo de foco em distância $D_{\text{foco}} = \|\mathbf{P}_{\text{câmera}}\|$.
+3. A amostragem de sub-pixels do SSAA 2x atua naturalmente como um denoiser Monte Carlo gratuito para o desfoque Bokeh óptico.
+
+---
+
+## 8. Mapeamento de Tom Fílmico e Antialiasing (SSAA 2x)
+
+### 8.1 Mapeamento de Tom Fílmico ACES com Exposição
+Para evitar estouro de branco em regiões de altíssimo Doppler mantendo os degradês avermelhados de corpo negro, o shader utiliza um mapeamento de tom fílmico expositivo:
+$$\mathbf{I}_{\text{tela}} = \left(1 - e^{-\mathbf{I}_{\text{acum}} \cdot 1.1}\right)^{\frac{1}{2.2}}$$
 
 ### 8.2 Antialiasing por Supersampling (SSAA 2x)
 Quando ativo, amostra 4 sub-pixels em padrão de grade rotacionada por pixel:
@@ -166,10 +164,11 @@ $$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{g
 
 * **Métrica de Kerr (1963):** Kerr, R. P. *"Gravitational Field of a Spinning Mass"* ([Phys. Rev. Lett. 11, 237](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.11.237)).
 * **ISCO e Órbitas em Kerr (1972):** Bardeen, J. M., Press, W. H., & Teukolsky, S. A. *"Rotating Black Holes"* ([ApJ, 178, 347-370](https://adsabs.harvard.edu/full/1972ApJ...178..347B)).
+* **Órbitas Esféricas de Fótons no Espaço-Tempo de Kerr (2003):** Teo, E. *"Spherical Photon Orbits in the Kerr Spacetime"* ([General Relativity and Gravitation 35, 1909-1926](https://doi.org/10.1023/A:1026286607562)).
 * **Integrador Geodésico em KS (2018):** Chan, C.-k., Medeiros, L., & Ozel, F. *"GRay2: geodesic integrator in Kerr-Schild coordinates"* ([ApJ 867 59](https://iopscience.iop.org/article/10.3847/1538-4357/aae4dd)).
-* **Formulação Hamiltoniana Conservativa (2018):** Bacchini, F., Ripperda, B., & Chen, A. Y. *"Conservative Hamiltonian formulation for general relativistic geodesics"* ([ApJS 237 6](https://iopscience.iop.org/article/10.3847/1538-4365/aac88f)).
-* **Disco de Acreção Novikov-Thorne (1973):** Novikov, I. D., & Thorne, K. S. *"Astrophysics of black holes"* in Black Holes (Les Astres Occlus), 343-450.
-* **Temperatura de Cor Tanner-Helland:** Tanner Helland's *"How to Convert Temperature (K) to RGB"* ([TannerHelland.com](https://tannerhelland.com/2012/10/26/color-temperature-rgb.html)).
+* **Geodésicas Hamiltonianas Conservativas (2018):** Bacchini, F., Ripperda, B., & Chen, A. Y. *"Conservative Hamiltonian formulation for general relativistic geodesics"* ([ApJS 237 6](https://iopscience.iop.org/article/10.3847/1538-4365/aac88f)).
+* **Disco de Acreção de Novikov-Thorne (1973):** Novikov, I. D., & Thorne, K. S. *"Astrophysics of black holes"* em Black Holes (Les Astres Occlus), 343-450.
+* **Temperatura de Cor de Tanner-Helland:** Tanner Helland's *"How to Convert Temperature (K) to RGB"* ([TannerHelland.com](https://tannerhelland.com/2012/10/26/color-temperature-rgb.html)).
 
 ---
 
@@ -193,10 +192,10 @@ $$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{g
    ```bash
    npm start
    ```
-4. Acesse no seu navegador: **`http://localhost:3000`** (ou abra `public/index.html` diretamente).
+4. Abra o navegador em **`http://localhost:3000`** (ou abra `public/index.html` diretamente).
 
 ---
 
 ## 📜 Licença (MIT)
 
-Este projeto possui código aberto sob a **Licença MIT**. Veja o arquivo `LICENSE` para mais detalhes.
+Este projeto é de código aberto e está licenciado sob a **Licença MIT**. Veja o arquivo `LICENSE` para detalhes.

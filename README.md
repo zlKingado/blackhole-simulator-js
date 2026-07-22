@@ -4,9 +4,9 @@
 
 > An interactive **Rotating Black Hole (Kerr)** simulator, running 100% in the browser. Developed in **HTML5, Javascript, and WebGL (Fragment Shader)**, it performs reverse ray tracing by numerically solving photon null geodesics in curved Kerr spacetime.
 
-The simulation incorporates full Kerr geodesics using a conservative Hamiltonian formulation in Kerr-Schild coordinates, high-precision RK4 numerical integration, a volumetric accretion disk with Novikov-Thorne thermodynamics, Kerr photon spheres with Einstein ring visualization, Relativistic Doppler Beaming, Gravitational Redshift, and Supersampling Antialiasing (SSAA 2x).
+The simulation incorporates full Kerr geodesics using a conservative Hamiltonian formulation in Kerr-Schild coordinates, metric-gradient adaptive RK4 numerical integration, a 3D volumetric accretion disk with Novikov-Thorne thermodynamics, Kerr photon spheres with Einstein ring visualization, Relativistic Doppler Beaming, Gravitational Redshift, GPU Physical Depth-of-Field (Bokeh DoF), Filmic ACES Tone Mapping, and Supersampling Antialiasing (SSAA 2x).
 
-> **Disclaimer:** This is an independent hobby project. I am not an academic physicist or an expert software engineer. The code was built out of passion for astronomy, but it incorporates rigorous general relativistic equations alongside numerical approximations. Modify and study at your own risk!
+> **Disclaimer:** This is an independent hobby project built out of passion for astrophysics and general relativity. The codebase incorporates rigorous theoretical equations (Bardeen 1972, Teo 2003, Chan 2018, Bacchini 2018) alongside real-time GPU numerical optimizations and perceptual visual scaling.
 
 ---
 
@@ -15,7 +15,7 @@ The simulation incorporates full Kerr geodesics using a conservative Hamiltonian
 <p align="center">
   <img src="image.png" alt="Gargantua Black Hole">
   <br>
-  <i>Real-time GPU rendering of the supermassive black hole.</i>
+  <i>Real-time GPU rendering of the supermassive Kerr black hole.</i>
 </p>
 
 ---
@@ -23,15 +23,15 @@ The simulation incorporates full Kerr geodesics using a conservative Hamiltonian
 ## Table of Contents
 1. [Rendering Methodology (Reverse Ray Tracing)](#1-rendering-methodology-reverse-ray-tracing)
 2. [Kerr-Schild Spacetime Geometry](#2-kerr-schild-spacetime-geometry)
-3. [Integration of Relativistic Geodesics (Conservative Hamiltonian RK4)](#3-integration-of-relativistic-geodesics-conservative-hamiltonian-rk4)
+3. [Integration of Relativistic Geodesics (Conservative Hamiltonian RK4 with Metric-Gradient Step Size)](#3-integration-of-relativistic-geodesics-conservative-hamiltonian-rk4-with-metric-gradient-step-size)
 4. [Gravitomagnetic Frame Dragging & ZAMO Plunge Motion](#4-gravitomagnetic-frame-dragging--zamo-plunge-motion)
 5. [Volumetric Accretion Disk Physics](#5-volumetric-accretion-disk-physics)
    - [Normalized Novikov-Thorne Thermal Profile](#51-normalized-novikov-thorne-thermal-profile)
    - [3D Volumetric Gas Modeling (Beer-Lambert Law)](#52-3d-volumetric-gas-modeling-beer-lambert-law)
-   - [Stefan-Boltzmann Luminosity & Combined Relativistic Redshift/Beaming](#53-stefan-boltzmann-luminosity--combined-relativistic-redshiftbeaming)
-6. [Visual Guide: Dynamic Kerr Photon Sphere](#6-visual-guide-dynamic-kerr-photon-sphere)
-7. [GPU Optimizations & Dynamic Escape Radius](#7-gpu-optimizations--dynamic-escape-radius)
-8. [EHT Blur Filter & Supersampling Antialiasing (SSAA 2x)](#8-eht-blur-filter--supersampling-antialiasing-ssaa-2x)
+   - [Combined Relativistic Redshift & Covariant Doppler Beaming](#53-combined-relativistic-redshift--covariant-doppler-beaming)
+6. [Visual Guide: Exact Kerr Photon Sphere (Bardeen 1972 / Teo 2003)](#6-visual-guide-exact-kerr-photon-sphere-bardeen-1972--teo-2003)
+7. [Physical GPU Depth-of-Field (Bokeh Lens Aperture)](#7-physical-gpu-depth-of-field-bokeh-lens-aperture)
+8. [Filmic Tone Mapping & Supersampling Antialiasing (SSAA 2x)](#8-filmic-tone-mapping--supersampling-antialiasing-ssaa-2x)
 9. [Scientific References](#9-scientific-references)
 10. [Installation and Execution](#10-installation-and-execution)
 
@@ -46,9 +46,9 @@ Instead of simulating photons emitted from the accretion disk in all random dire
 For each screen pixel:
 1. Normalized 2D screen coordinates are mapped to a 3D initial photon ray direction $\mathbf{n}$.
 2. The initial photon canonical momentum vector $\mathbf{p}$ is computed at the observer's position matching the local Kerr-Schild metric tensor $f(r, \theta)$ and incoming direction vector $\mathbf{l}$.
-3. The null geodesic trajectory is numerically integrated step-by-step using 4th-Order Runge-Kutta (RK4).
-4. As the photon steps through space, it accumulates emission brightness and opacity from the 3D accretion disk according to the Beer-Lambert law.
-5. If the photon enters the outer event horizon ($r_{\text{eff}} \le r_+ = M + \sqrt{M^2 - a^2}$), integration stops immediately and the ray is marked as absorbed (shadow of the black hole).
+3. The null geodesic trajectory is numerically integrated step-by-step using 4th-Order Runge-Kutta (RK4) with metric-gradient adaptive stepping.
+4. As the photon steps through space, it accumulates emission brightness and opacity from the 3D accretion disk according to Beer-Lambert's law.
+5. If the photon enters the outer event horizon ($r_{\text{eff}} \le r_+ = M + \sqrt{M^2 - a^2}$), integration stops immediately and the ray is marked as absorbed (black hole shadow).
 6. If the photon escapes to radial distances exceeding the dynamic escape boundary ($R^2 > R_{\text{escape}}^2$), the final ray momentum vector is used to sample the procedural background starfield and galactic nebula.
 
 ---
@@ -57,7 +57,7 @@ For each screen pixel:
 
 A rotating black hole with gravitational mass $M$ and spin $J$ is described by the Kerr metric. The dimensionless spin parameter $a = J/M$ ($0 \le a < 1$) governs spacetime rotation and frame dragging.
 
-In Kerr-Schild Cartesian coordinates $(x,y,z)$, the metric tensor is decomposed into flat Minkowski space plus a scalar scalar metric factor $f(r, \theta)$ and a outgoing null vector $l_\mu$:
+In Kerr-Schild Cartesian coordinates $(x,y,z)$, the metric tensor is decomposed into flat Minkowski space plus a scalar metric factor $f(r, \theta)$ and an outgoing null vector $l_\mu$:
 $$g_{\mu\nu} = \eta_{\mu\nu} + f l_\mu l_\nu$$
 where:
 $$f(r, \theta) = \frac{2 M r^3}{r^4 + a^2 z^2}$$
@@ -72,22 +72,17 @@ $$r_+ = M + \sqrt{M^2 - a^2}$$
 
 ---
 
-## 3. Integration of Relativistic Geodesics (Conservative Hamiltonian RK4)
+## 3. Integration of Relativistic Geodesics (Conservative Hamiltonian RK4 with Metric-Gradient Step Size)
 
 Photons travel along null geodesics ($ds^2 = 0$). The simulator uses the **Conservative Hamiltonian Formulation** (Chan, Medeiros & Ozel 2018; Bacchini et al. 2018) in Kerr-Schild coordinates to compute equations of motion for position $\mathbf{x}$ and momentum $\mathbf{p}$:
 $$\frac{d\mathbf{x}}{d\lambda} = \mathbf{p} - f \mathbf{l} V$$
 $$\frac{d\mathbf{p}}{d\lambda} = \frac{1}{2} V^2 \nabla f + f V (\mathbf{p} \cdot \nabla \mathbf{l})$$
 where $V = (\mathbf{p} \cdot \mathbf{l}) - 1$.
 
-Integration is performed using the **4th-Order Runge-Kutta Method (RK4)**:
-- $k_1 = g(\mathbf{x}, \mathbf{p})$
-- $k_2 = g\left(\mathbf{x} + \frac{dt}{2} k_{1,x}, \mathbf{p} + \frac{dt}{2} k_{1,p}\right)$
-- $k_3 = g\left(\mathbf{x} + \frac{dt}{2} k_{2,x}, \mathbf{p} + \frac{dt}{2} k_{2,p}\right)$
-- $k_4 = g\left(\mathbf{x} + dt \cdot k_{3,x}, \mathbf{p} + dt \cdot k_{3,p}\right)$
-- $\mathbf{x}_{\text{next}} = \mathbf{x} + \frac{dt}{6} (k_{1,x} + 2 k_{2,x} + 2 k_{3,x} + k_{4,x})$
-- $\mathbf{p}_{\text{next}} = \mathbf{p} + \frac{dt}{6} (k_{1,p} + 2 k_{2,p} + 2 k_{3,p} + k_{4,p})$
+Integration is performed using the **4th-Order Runge-Kutta Method (RK4)** with a **Metric-Gradient Adaptive Step Size**:
+$$dt_{\text{local}} = dt_{\text{base}} \cdot \frac{\text{clamp}(r / 1.5, 0.25, 40.0)}{1 + 1.2 \|\nabla f\|}$$
 
-Adaptive step sizing ($dt_{\text{local}}$) dynamically refines resolution near the event horizon and near the accretion disk midplane ($|z| < 1.2M$).
+This dynamically refines numerical precision near strong curvature gradients ($\|\nabla f\|$) and near the horizon ($r \to r_+$), while preventing horizon penetration artifacts via double-layer fall-through protection.
 
 ---
 
@@ -95,7 +90,7 @@ Adaptive step sizing ($dt_{\text{local}}$) dynamically refines resolution near t
 
 When the black hole rotates ($a > 0$), spacetime itself is dragged around the central axis (Lense-Thirring effect).
 
-1. **Geodesic Dragging:** The metric derivative terms $\nabla f$ and $\nabla \mathbf{l}$ in the Hamiltonian equations naturally drag light trajectories in the direction of spin.
+1. **Geodesic Dragging:** The metric derivative terms $\nabla f$ and $\nabla \mathbf{l}$ in the Hamiltonian equations naturally drag light trajectories in the direction of spin. A unified spin parameter $a_{\text{geo}} = \text{u\_dragging} ? a : 0.0$ guarantees strict physical consistency between photon curvature and accretion disk orbital motion.
 2. **Plunge Region Velocity Blending:** Plasma inside the ISCO ($r < r_{\text{isco}}$) no longer maintains stable Keplerian orbits. The orbital angular velocity $\Omega_K$ is smoothly blended from Keplerian velocity at ISCO ($\Omega_{\text{isco}}$) to ZAMO (Zero Angular Momentum Observer) frame dragging velocity ($\Omega_{\text{zamo}} = -g_{t\phi}/g_{\phi\phi}$) at the event horizon:
 $$\Omega_K(r) = \text{mix}\left(\Omega_{\text{zamo}}, \Omega_{\text{isco}}, \text{smoothstep}(r_+, r_{\text{isco}}, r)\right)$$
 
@@ -113,48 +108,51 @@ Plasma temperature follows the **Novikov-Thorne** relativistic thin-disk profile
 $$T(r) = T_{\text{peak}} \cdot \left(\frac{r_{\text{isco}}}{r}\right)^{0.75} \cdot \left(1 - \sqrt{\frac{r_{\text{isco}}}{r}}\right)^{0.25} \cdot 2.2$$
 
 ### 5.2 3D Volumetric Gas Modeling (Beer-Lambert Law)
-The gas disk has a finite thickness $H = 0.8M$, with Gaussian vertical decay and exponential radial decay:
-$$\rho(r, z) = e^{-0.15(r - r_{\text{isco}})} \cdot e^{-\frac{z^2}{0.06}} \cdot \text{Noise}_{3D}\left(\mathbf{p}_{\text{rot}}\right)$$
+The gas disk has a 3D Gaussian vertical decay and exponential radial density profile with multi-scale turbulence noise:
+$$\rho(r, z) = e^{-0.10(r - r_{\text{isco}})} \cdot e^{-\frac{z^2}{0.08}} \cdot \text{Noise}_{3D}\left(\mathbf{p}_{\text{rot}}\right)$$
 
-Volumetric ray marching accumulates opacity and emission over step distance $dt$ using **Beer-Lambert's Law**:
+Volumetric ray marching accumulates opacity and emission over step distance $dt$ using **Beer-Lambert's Law** ($k_{\text{opacity}} = 6.0$):
 $$\Delta \alpha = 1 - e^{-\rho \cdot dt \cdot k_{\text{opacity}}}$$
 $$\mathbf{I}_{\text{accum}} = \mathbf{I}_{\text{accum}} + (1 - \alpha_{\text{accum}}) \cdot \mathbf{C}_{\text{emission}} \cdot \Delta \alpha$$
 
-### 5.3 Stefan-Boltzmann Luminosity & Combined Relativistic Redshift/Beaming
-1. **Gravitational & Kinematic Redshift ($g_{\text{emit}}$):**
-$$g_{\text{emit}} = \sqrt{- (g_{tt} + 2 \Omega_K g_{t\phi} + \Omega_K^2 g_{\phi\phi})}$$
-$$g_{\text{factor}} = g_{\text{obs}} \cdot g_{\text{emit}} \cdot g_{\text{doppler}}$$
+### 5.3 Combined Relativistic Redshift & Covariant Doppler Beaming
+1. **Gravitational & Kinematic Redshift ($g_{\text{grav}}$):**
+$$g_{\text{grav}} = \frac{g_{\text{obs}}}{u^t_{\text{disc}}}$$
+where $u^t_{\text{disc}} = 1/\sqrt{-(g_{tt} + 2 \Omega_K g_{t\phi} + \Omega_K^2 g_{\phi\phi})}$.
 
 2. **Doppler Beaming ($g_{\text{doppler}}$):**
-$$g_{\text{doppler}} = \frac{1}{1 - \Omega_K L_z}$$
-where $L_z = x p_y - y p_x$ is the conserved photon z-angular momentum.
+$$g_{\text{doppler}} = \frac{1}{\max(0.25, 1 - \Omega_K L_z)}$$
+where $L_z = x p_y - y p_x$ is the conserved photon Killing axial angular momentum.
 
-Observed plasma temperature becomes $T_{\text{obs}} = g_{\text{factor}} \cdot T(r)$, which is mapped to RGB blackbody emission via the Tanner Helland algorithm. Luminosity scales according to Stefan-Boltzmann law ($\propto T_{\text{obs}}^4$).
-
----
-
-## 6. Visual Guide: Dynamic Kerr Photon Sphere
-
-When toggled on, an interactive shell grid highlights the sphere of unstable spherical photon orbits. In Kerr spacetime, the photon sphere radius ranges between $1.5M$ (prograde) and $4.0M$ (retrograde).
-
-When a photon trajectory grazes this boundary ($r \approx r_{\text{photon}}$), a cyan aura ($\text{RGB} = [0.0, 0.85, 1.0]$) with polar and azimuthal grid lines is drawn onto the ray.
+Observed plasma temperature $T_{\text{obs}} = g_{\text{factor}} \cdot T(r)$ is mapped to RGB blackbody color via the Tanner Helland algorithm with perceptual luminosity scaling for real-time WebGL dynamic range.
 
 ---
 
-## 7. GPU Optimizations & Dynamic Escape Radius
+## 6. Visual Guide: Exact Kerr Photon Sphere (Bardeen 1972 / Teo 2003)
 
-1. **Resolution Scaling:** Display resolutions exceeding 1080p are capped at a maximum of $1920 \times 1080$ pixels to ensure smooth 60 FPS performance on High-DPI screens.
-2. **Dynamic Escape Radius:** The background escape cutoff radius scales with camera distance:
-$$R_{\text{escape}}^2 = \max(900.0, 2.0 \cdot |\mathbf{x}_{\text{camera}}|^2)$$
-This allows the observer camera to zoom out up to $80.0M$ without background starfield clipping or dark artifact patches.
-3. **Mobile Touch Support:** Supports single-finger drag for orbiting camera inclination/azimuth and two-finger pinch gesture for zoom distance.
+When toggled on, a 3D wireframe shell highlights the exact prograde spherical photon orbit radius derived by Bardeen et al. (1972) and Teo (2003):
+$$r_{\text{photon}} = 2 M \left(1 + \cos\left(\frac{2}{3} \arccos(-a_{\text{geo}} / M)\right)\right)$$
+
+For Schwarzschild ($a=0$), $r_{\text{photon}} = 3M$. For maximum Kerr ($a=0.99M$), $r_{\text{photon}}$ shrinks smoothly to $1.17M$.
 
 ---
 
-## 8. EHT Blur Filter & Supersampling Antialiasing (SSAA 2x)
+## 7. Physical GPU Depth-of-Field (Bokeh Lens Aperture)
 
-### 8.1 Lens Blur Filter
-Emulates the effective angular resolution limit of the Event Horizon Telescope (EHT) by applying a GPU-accelerated Gaussian blur slider (up to 20px) to the render canvas viewport.
+Instead of a flat 2D CSS post-processing blur, the simulator incorporates a **Physical Thin-Lens Aperture Model** running directly inside the GPU ray tracer.
+
+When DoF is enabled:
+1. The ray origin is perturbed on the camera lens plane using uniform disk distribution: $\mathbf{P}_{\text{lens}} = \mathbf{P}_{\text{cam}} + r_{\text{aperture}} (\cos\theta \mathbf{R} + \sin\theta \mathbf{U})$.
+2. The ray direction is re-aimed towards the focus target point at distance $D_{\text{focus}} = \|\mathbf{P}_{\text{cam}}\|$.
+3. Subpixel sampling during SSAA 2x naturally acts as a zero-cost Monte Carlo denoiser for the optical bokeh blur.
+
+---
+
+## 8. Filmic Tone Mapping & Supersampling Antialiasing (SSAA 2x)
+
+### 8.1 Filmic ACES Exposure Tone Mapping
+To prevent white clipping on Doppler-boosted regions while preserving dark reddish blackbody gradients, the shader uses filmic exposure tone mapping:
+$$\mathbf{I}_{\text{screen}} = \left(1 - e^{-\mathbf{I}_{\text{accum}} \cdot 1.1}\right)^{\frac{1}{2.2}}$$
 
 ### 8.2 Supersampling Antialiasing (SSAA 2x)
 When active, samples 4 sub-pixel locations in a rotated grid pattern per pixel:
@@ -166,6 +164,7 @@ $$\mathbf{I}_{\text{final}} = \frac{1}{4} \sum_{s=1}^{4} \mathbf{I}\left(\text{g
 
 * **Kerr Metric (1963):** Kerr, R. P. *"Gravitational Field of a Spinning Mass"* ([Phys. Rev. Lett. 11, 237](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.11.237)).
 * **ISCO & Orbits in Kerr (1972):** Bardeen, J. M., Press, W. H., & Teukolsky, S. A. *"Rotating Black Holes"* ([ApJ, 178, 347-370](https://adsabs.harvard.edu/full/1972ApJ...178..347B)).
+* **Spherical Photon Orbits in Kerr Spacetime (2003):** Teo, E. *"Spherical Photon Orbits in the Kerr Spacetime"* ([General Relativity and Gravitation 35, 1909-1926](https://doi.org/10.1023/A:1026286607562)).
 * **Geodesic Integrator in KS (2018):** Chan, C.-k., Medeiros, L., & Ozel, F. *"GRay2: geodesic integrator in Kerr-Schild coordinates"* ([ApJ 867 59](https://iopscience.iop.org/article/10.3847/1538-4357/aae4dd)).
 * **Conservative Hamiltonian Geodesics (2018):** Bacchini, F., Ripperda, B., & Chen, A. Y. *"Conservative Hamiltonian formulation for general relativistic geodesics"* ([ApJS 237 6](https://iopscience.iop.org/article/10.3847/1538-4365/aac88f)).
 * **Novikov-Thorne Accretion Disk (1973):** Novikov, I. D., & Thorne, K. S. *"Astrophysics of black holes"* in Black Holes (Les Astres Occlus), 343-450.
